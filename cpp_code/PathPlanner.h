@@ -42,10 +42,12 @@ public:
     void displayPath();
     bool inBounds(int point[2]);
     void setScaling(int radius);
+#ifdef DEBUG
         //display functions, used for debugging
     void displayBMP();
     void displayStates();
     void displayCosts();
+#endif
     
 private:
     //no default constr
