@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   PathPlanner.h
  * Author: lapin
  *
@@ -9,58 +9,66 @@
 #define	PATHPLANNER_H
 #include <string>
 #include <vector>
+#include <cstdint>
 
-//easier to handle the nodeMap with this structure (more explicit than using arrays)
-//besides state and cost here arent the same type
+#define NEW 0
+#define FRONTIER NEW+1
+#define EXPLORED NEW+2
+#define UNREACHABLE NEW+3
+#define SCALING NEW+4
+
+
 struct Node {
-    int state;
-    float cost;
+	int x;
+	int y;
+	int single_cost;
+	int state;
 };
 
-//this structure is used because its WAY easier to handle vector of structure
-//rather than a vector of int
-struct Point {
-    int x;
-    int y;
-    
-    //need to declare defualt constructor for some reason
-    Point(int X,int Y) : x(X), y(Y) {}
-    
-    Point(const Point& toCopy) {
-        x = toCopy.x;
-        y = toCopy.y;
-    }
-};
+struct Path {
+	std::vector<Node*> nodes;
+	int currentCost;
+	int heuristicCost;
 
+	Path() {}
+
+	Path(int current, int heuristic) : currentCost(current), heuristicCost(heuristic) {}
+
+	bool operator < (const Path& o) const
+	{
+		return (currentCost + heuristicCost > o.heuristicCost + o.currentCost);
+	}
+};
 
 class PathPlanner {
-public:
-    PathPlanner(std::string path);
-    ~PathPlanner();
-    bool Planning(int start[2], int goal[2]);
-    std::vector<Point> getPath();
-    void displayPath();
-    bool inBounds(int point[2]);
-    void setScaling(int radius);
+	public:
+		PathPlanner(std::string path,int);
+		~PathPlanner();
+		bool Planning(int start[2], int goal[2]);
+		Path getPath();
+		bool inBounds(int point[2]);
+		void setScaling(int radius);
+		void updateSingleNodeMap();
 #ifdef DEBUG
-        //display functions, used for debugging
-    void displayBMP();
-    void displayStates();
-    void displayCosts();
+		//display functions, used for debugging
+		void displayPath();
+		void displayBMP();
+		void displayCosts();
+		void displayStates();
 #endif
-    
-private:
-    //no default constr
-    PathPlanner()  {}
 
-    //used by the planning method
-    void ChoosePath(int[2],int[2]);
+	private:
+		//no default constr
+		PathPlanner()  {}
 
-    Node** nodeMap;
-    char** map;
-    int width;
-    int height;
-    std::vector<Point> path;
+		//used by the planning method
+		inline int computeHeuristic(int,int,int,int);
+		void ChoosePath(int[2],int[2]);
+
+		Node** nodeMap;
+		int width;
+		int height;
+		Path path;
 };
 
 #endif	/* PATHPLANNER_H */

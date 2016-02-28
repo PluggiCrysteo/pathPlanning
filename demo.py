@@ -12,10 +12,10 @@ purple = (120,0,120)
 
 ################# GETTING PARAM
 parser = argparse.ArgumentParser(description='Display path calculated by another process')
-parser.add_argument('-b','--bitmapPath', help='Specify the path of the bitmap to load and display.', type=str)
+parser.add_argument(dest='bitmapPath', help='Specify the path of the bitmap to load and display.', type=str)
 parser.add_argument('-s','--scale', help='Set the scale that will be used to display the map. The more pixels your map has, the smaller scale should be. Default is 50.', type=int)
 args = parser.parse_args()
- 
+
 if args.scale != None :
 	scale = args.scale
 else:
@@ -25,14 +25,14 @@ if args.bitmapPath != None :
 	bitmapPath = args.bitmapPath
 else:
 	bitmapPath = "bitmap"
-	
+
 bitmap = open(bitmapPath)
 height = sum(1 for line in bitmap)
 width = os.path.getsize(bitmapPath)/height -1
 
 ########### INIT
 
-nodeMap = [[0 for x in range(height)] for x in range(width)] 
+nodeMap = [[0 for x in range(height)] for x in range(width)]
 
 screen = pygame.display.set_mode((scale*width,scale*height))
 screen.fill((255,255,255))
@@ -87,7 +87,7 @@ socket.bind((localhost,port))
 socket.listen(0)
 	
 def requestPath(startX,startY,goalX,goalY):
-	os.system("./pathplanner " + str(startX) + " "+ str(startY) + " "+ str(goalX) + " "+ str(goalY))
+	os.system("./demo.out " + str(startX) + " "+ str(startY) + " "+ str(goalX) + " "+ str(goalY))
 	try:
 		conn, addr = socket.accept()
 		data = conn.recv(buffer_size)

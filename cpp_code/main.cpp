@@ -6,6 +6,7 @@
 
 #include "PathPlanner.h"
 
+
 int main (int argc, char** argv) {
 
 int startX = std::atoi(argv[1]);
@@ -16,12 +17,12 @@ int goalX = std::atoi(argv[3]);
 int goalY = std::atoi(argv[4]);
 int goal[2] = {goalX,goalY};
 
-PathPlanner planner("bitmap");
-planner.setScaling(0);
+PathPlanner planner("bitmap",0);
+//planner.setScaling(0);
 planner.Planning(start,goal);
+#ifdef DEBUG
 planner.displayCosts();
-// TODO SEND TO TCP
-
+#endif
 boost::asio::io_service io_service;
 boost::asio::ip::tcp::resolver resolver(io_service);
 boost::asio::ip::tcp::resolver::query query("127.0.0.1", "1234");
@@ -44,12 +45,12 @@ if(error) {
 boost::asio::streambuf buffer;
 std::ostream stream(&buffer);
 	
-for(int i =0; i< planner.getPath().size();i++) {
+for(int i =0; i< planner.getPath().nodes.size();i++) {
 char bufferX [10];
 char bufferY [10];
 
-sprintf(bufferX,"%d",planner.getPath()[i].x);
-sprintf(bufferY,"%d",planner.getPath()[i].y);
+sprintf(bufferX,"%d",planner.getPath().nodes[i]->x);
+sprintf(bufferY,"%d",planner.getPath().nodes[i]->y);
 
 	stream << "(" << bufferX << "," << bufferY << ")";
 
