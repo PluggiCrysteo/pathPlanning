@@ -7,9 +7,7 @@
 
 #ifndef PATHPLANNER_H
 #define	PATHPLANNER_H
-#include <string>
 #include <vector>
-#include <cstdint>
 
 #define NEW 0
 #define FRONTIER NEW+1
@@ -42,7 +40,7 @@ struct Path {
 
 class PathPlanner {
 	public:
-		PathPlanner(std::string path,int);
+		PathPlanner(const char*,int);
 		~PathPlanner();
 		bool Planning(int start[2], int goal[2]);
 		Path getPath();
@@ -64,6 +62,7 @@ class PathPlanner {
 		//used by the planning method
 		inline int computeHeuristic(int,int,int,int);
 		void ChoosePath(int[2],int[2]);
+		void expandNode(Path,std::vector<Path>*, int,int,int,int[2]);
 
 		Node** nodeMap;
 		int width;

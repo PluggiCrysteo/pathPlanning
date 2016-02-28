@@ -20,9 +20,7 @@ int goal[2] = {goalX,goalY};
 PathPlanner planner("bitmap",0);
 //planner.setScaling(0);
 planner.Planning(start,goal);
-#ifdef DEBUG
-planner.displayCosts();
-#endif
+
 boost::asio::io_service io_service;
 boost::asio::ip::tcp::resolver resolver(io_service);
 boost::asio::ip::tcp::resolver::query query("127.0.0.1", "1234");

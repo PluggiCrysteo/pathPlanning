@@ -6,7 +6,6 @@
  */
 
 #include "PathPlanner.h"
-#include <string>
 #include <fstream>
 #include <cstdlib>
 #include <algorithm>
@@ -23,9 +22,8 @@
  *	'0' -> '9' (cost)
  ********************************/
 
-PathPlanner::PathPlanner(std::string path,int scaling = -1) {
-	const char* ok = path.c_str();
-	std::fstream file(ok, std::ios::in | std::ios::out | std::ios::binary);
+PathPlanner::PathPlanner(const char* bitmap,int scaling = -1) {
+	std::fstream file(bitmap, std::ios::in | std::ios::out | std::ios::binary);
 
 	file.seekg(0);
 	width=0;
@@ -68,14 +66,12 @@ PathPlanner::PathPlanner(std::string path,int scaling = -1) {
 	if(scaling > 0) {
 		setScaling(scaling);
 	}
-	DEBUG_("constructor finished");
 }
 
 //returns true if there were no prob creating a path
 //error only occur if there's something wrong with the parameter
 //can (and will) return true even if there is no way to the destination
 bool PathPlanner::Planning(int start[2], int goal[2]) {
-	DEBUG_("starting planning func");
 	if(!inBounds(start) || !inBounds(goal)) return false;
 
 	std::vector<Path> pathList;
@@ -87,8 +83,6 @@ bool PathPlanner::Planning(int start[2], int goal[2]) {
 	Path newpath;
 	Path toexpand;
 	Node* lastnode;
-
-	DEBUG_("about to loop\n");
 
 	while(pathList.size() != 0 ) {
 		std::sort(pathList.begin(),pathList.end());
@@ -105,40 +99,29 @@ bool PathPlanner::Planning(int start[2], int goal[2]) {
 		if( lastnode->state != EXPLORED) {
 
 			//bottom
-			if(nodeMap[lastnode->x][lastnode->y+1].state <= FRONTIER) {
-				newpath = toexpand;
-				newpath.nodes.push_back(&nodeMap[lastnode->x][lastnode->y+1]);
-				newpath.currentCost += nodeMap[lastnode->x][lastnode->y+1].single_cost;
-				newpath.heuristicCost = computeHeuristic(lastnode->x,lastnode->y+1,goal[0],goal[1]);
-				pathList.push_back(newpath);
-			}
+			expandNode(toexpand,&pathList,0,1,3,goal);
 
 			//right
-			if(nodeMap[lastnode->x+1][lastnode->y].state <= FRONTIER) {
-				newpath = toexpand;
-				newpath.nodes.push_back(&nodeMap[lastnode->x+1][lastnode->y]);
-				newpath.currentCost += nodeMap[lastnode->x+1][lastnode->y].single_cost;
-				newpath.heuristicCost = computeHeuristic(lastnode->x+1,lastnode->y,goal[0],goal[1]);
-				pathList.push_back(newpath);
-			}
+			expandNode(toexpand,&pathList,1,0,3,goal);
 
 			// left
-			if(nodeMap[lastnode->x-1][lastnode->y].state <= FRONTIER) {
-				newpath = toexpand;
-				newpath.nodes.push_back(&nodeMap[lastnode->x-1][lastnode->y]);
-				newpath.currentCost += nodeMap[lastnode->x-1][lastnode->y].single_cost;
-				newpath.heuristicCost = computeHeuristic(lastnode->x-1,lastnode->y,goal[0],goal[1]);
-				pathList.push_back(newpath);
-			}
+			expandNode(toexpand,&pathList,-1,0,3,goal);
 
 			//top
-			if(nodeMap[lastnode->x][lastnode->y-1].state <= FRONTIER) {
-				newpath = toexpand;
-				newpath.nodes.push_back(&nodeMap[lastnode->x][lastnode->y-1]);
-				newpath.currentCost += nodeMap[lastnode->x][lastnode->y-1].single_cost;
-				newpath.heuristicCost = computeHeuristic(lastnode->x,lastnode->y-1,goal[0],goal[1]);
-				pathList.push_back(newpath);
-			}
+			expandNode(toexpand,&pathList,0,-1,3,goal);
+
+			//top-left
+			expandNode(toexpand,&pathList,-1,-1,4,goal);
+
+			//top-right
+			expandNode(toexpand,&pathList,1,-1,4,goal);
+
+			//bottom-left
+			expandNode(toexpand,&pathList,-1,1,4,goal);
+
+			//bottom-right
+			expandNode(toexpand,&pathList,1,1,4,goal);
+
 			toexpand.nodes.back()->state = EXPLORED;
 		}
 
@@ -201,7 +184,18 @@ void PathPlanner::setScaling(int radius) {
 }
 
 int PathPlanner::computeHeuristic(int xs, int ys, int xg, int yg) {
-	return abs(nodeMap[xs][ys].x -nodeMap[xg][yg].x) + abs(nodeMap[xs][ys].y -nodeMap[xg][yg].y);
+	return 4*std::min(abs(nodeMap[xs][ys].x -nodeMap[xg][yg].x),abs(nodeMap[xs][ys].y -nodeMap[xg][yg].y))+3*abs(abs(nodeMap[xs][ys].x -nodeMap[xg][yg].x)-abs(nodeMap[xs][ys].y -nodeMap[xg][yg].y));
+
+}
+
+void PathPlanner::expandNode(Path toexpand,std::vector<Path>* pathList, int xoffset,int yoffset,int costcoef, int goal[2]) {
+	if(nodeMap[toexpand.nodes.back()->x+xoffset][toexpand.nodes.back()->y+yoffset].state <= FRONTIER) {
+		toexpand.currentCost += costcoef*nodeMap[toexpand.nodes.back()->x+xoffset][toexpand.nodes.back()->y+yoffset].single_cost;
+		toexpand.heuristicCost = computeHeuristic(toexpand.nodes.back()->x+xoffset,toexpand.nodes.back()->y+yoffset,goal[0],goal[1]);
+		toexpand.nodes.push_back(&nodeMap[toexpand.nodes.back()->x+xoffset][toexpand.nodes.back()->y+yoffset]);
+		pathList->push_back(toexpand);
+	}
+
 }
 
 #ifdef DEBUG
