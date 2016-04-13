@@ -1,223 +1,144 @@
-/* 
+/*
  * File:   PathPlanner.cpp
  * Author: lapin
- * 
+ *
  * Created on May 24, 2015, 11:10 PM
  */
 
 #include "PathPlanner.h"
-#include <string>
 #include <fstream>
+#include <cstdlib>
+#include <algorithm>
+
+#ifdef DEBUG
 #include <iostream>
-#include <cmath>
-#define NEW 0
-#define OPEN 1
-#define CLOSE 2
-#define UNREACHABLE 3
+#define DEBUG_(x, ...) fprintf(stderr,"\033[31m%s/%s/%d: " x "\033[0m\n",__FILE__,__func__,__LINE__,##__VA_ARGS__);
+#else
+#define DEBUG_(x, ...)
+#endif
 
 /********************************
-*	X=unreachable
-*	'0' -> '9' (cost)
-********************************/
+ *	X=unreachable
+ *	'0' -> '9' (cost)
+ ********************************/
 
-PathPlanner::PathPlanner(std::string path) {
-const char* ok = path.c_str();
-std::fstream file(ok, std::ios::in | std::ios::out | std::ios::binary);
+PathPlanner::PathPlanner(const char* bitmap,int scaling = -1) {
+	std::fstream file(bitmap, std::ios::in | std::ios::out | std::ios::binary);
+	if(!file.good())
+		DEBUG_("file not correctlry opened");
+	file.seekg(0);
+	width=0;
+	while(file.get() != '\n')
+		width++;
 
-file.seekg(0);
-width=0;
-while(file.get() != '\n') {
-	width++;
+	file.seekg( 0, std::ios::end );
+	height = file.tellg()/(width+1);
+	file.seekg(0);
+
+	nodeMap = new Node*[width];
+	for(int i=0; i<width;i++) {
+		for(int j=0;j<height;j++) {
+			nodeMap[i] = new Node[height];
+		}
 	}
-	
-	
-file.seekg( 0, std::ios::end );
-height = file.tellg()/(width+1);
-map = new char*[width];
-nodeMap = new Node*[width];
-file.seekg(0);
 
-for(int i=0;i<width;i++) {
-	map[i]= new char[height];
-        nodeMap[i] = new Node[height];
-}
+	char readchar;
 
-for(int j=0; j<height;j++) {
-    for(int i=0;i<width;i++) {
-	map[i][j]=file.get();
-    }
-        file.get();
-    
-}
-file.close();
+	for(int j=0; j<height;j++) {
+		for(int i=0;i<width;i++) {
+			nodeMap[i][j].x = i;
+			nodeMap[i][j].y = j;
+
+			if( ( readchar = file.get()) == 'X') {
+				nodeMap[i][j].state = UNREACHABLE;
+			} else {
+				nodeMap[i][j].state = NEW;
+				nodeMap[i][j].single_cost = readchar - '0';
+			}
+
+		}
+		file.get();
+
+	}
+
+
+	file.close();
+
+	if(scaling > 0) {
+		setScaling(scaling);
+	}
 }
 
 //returns true if there were no prob creating a path
 //error only occur if there's something wrong with the parameter
 //can (and will) return true even if there is no way to the destination
 bool PathPlanner::Planning(int start[2], int goal[2]) {
-    if(!inBounds(start) || !inBounds(goal)) return false;
-for(int j=0; j<height;j++) {
-    for(int i=0;i<width;i++) {
-        if(map[i][j] == 'X' || map[i][j] == 'S') {
-            nodeMap[i][j].state=UNREACHABLE;
-	} else {
-            nodeMap[i][j].state=NEW;
-        }
-    }   
-}
-    bool done = false;
-    nodeMap[goal[0]][goal[1]].cost=0;
-    nodeMap[goal[0]][goal[1]].state=OPEN;
-    while(!done) {
-        done = true;
-        
-        for(int i=1;i<height-1;i++) {
-            for(int j=1;j<width-1;j++) {
-                if(nodeMap[j][i].state == OPEN) {
-                    
-                    //bottom
-                    if(nodeMap[j][i+1].state == NEW) {
-                        nodeMap[j][i+1].cost=nodeMap[j][i].cost+1*(map[j][i+1]-'0'+1);
-                        nodeMap[j][i+1].state = OPEN;
-                    } else if (nodeMap[j][i+1].cost > nodeMap[j][i].cost+1*(map[j][i+1]-'0'+1))
-        	            {
-	                    nodeMap[j][i+1].cost=nodeMap[j][i].cost+1*(map[j][i+1]-'0'+1);
-        	            }
+	if(!inBounds(start) || !inBounds(goal)) return false;
+
+	std::vector<Path> pathList;
+	Path init(0,computeHeuristic(start[0],start[1],goal[0],goal[1]));
+	init.nodes.push_back(&nodeMap[start[0]][start[1]]);
+	nodeMap[start[0]][start[1]].state = FRONTIER;
+	pathList.push_back(init);
+
+	Path newpath;
+	Path toexpand;
+	Node* lastnode;
+
+	while(pathList.size() != 0 ) {
+		std::sort(pathList.begin(),pathList.end());
+		toexpand = pathList.back();
+		pathList.pop_back();
+
+		if(toexpand.nodes.back() == &nodeMap[goal[0]][goal[1]]) {
+			path = toexpand;
+			return true;
+		}
+
+		lastnode = toexpand.nodes.back();
+
+		if( lastnode->state != EXPLORED) {
+
+			//bottom
+			expandNode(toexpand,&pathList,0,1,3,goal);
 
 			//right
-                    if(nodeMap[j+1][i].state == NEW) {
-                        nodeMap[j+1][i].cost=nodeMap[j][i].cost+1*(map[j+1][i]-'0'+1);
-                        nodeMap[j+1][i].state = OPEN;
-                    } else if (nodeMap[j+1][i].cost > nodeMap[j][i].cost+1*(map[j+1][i]-'0'+1))
-        	            {
-	                    nodeMap[j+1][i].cost=nodeMap[j][i].cost+1*(map[j+1][i]-'0'+1);
-        	            }
-        	            
-        	    // left
-                    if(nodeMap[j-1][i].state == NEW) {
-                        nodeMap[j-1][i].cost=nodeMap[j][i].cost+1*(map[j-1][i]-'0'+1);
-                        nodeMap[j-1][i].state = OPEN;
-                    } else if (nodeMap[j-1][i].cost > nodeMap[j][i].cost+1*(map[j-1][i]-'0'+1))
-        	            {
-	                    nodeMap[j-1][i].cost=nodeMap[j][i].cost+1*(map[j-1][i]-'0'+1);
-        	            }
-                    
-                    //top
-                    if(nodeMap[j][i-1].state == NEW) {
-                        nodeMap[j][i-1].cost=nodeMap[j][i].cost+1*(map[j][i-1]-'0'+1);
-                        nodeMap[j][i-1].state = OPEN;
-                    } else if (nodeMap[j][i-1].cost > nodeMap[j][i].cost+1*(map[j][i-1]-'0'+1))
-        	            {
-	                    nodeMap[j][i-1].cost=nodeMap[j][i].cost+1*(map[j][i-1]-'0'+1);
-        	            }
+			expandNode(toexpand,&pathList,1,0,3,goal);
 
-                    done = false;
-                    nodeMap[j][i].state = CLOSE;
-                }
-            }
-        }
-    }
-    ChoosePath(start,goal);
-    return true;
-}
+			// left
+			expandNode(toexpand,&pathList,-1,0,3,goal);
 
-void PathPlanner::ChoosePath(int start[2], int goal[2]) {
-    if(nodeMap[start[0]][start[1]].state != CLOSE) {
-        path.clear();
-        return;
-    }
-        
-        path.push_back(Point(start[0],start[1]));
-        while(nodeMap[path.back().x][path.back().y].cost != 0) {
-        
-            float nextCost = nodeMap[start[0]][start[1]].cost;
-            int nextNode[2] = {start[0],start[1]};
-            
-            for(int i=-1;i<2;i++) {
-                for(int j=(i-1)*(i+1);j<=-(i+1)*(i-1);j++) {
-                    if(nodeMap[path.back().x+j][path.back().y+i].cost < nextCost &&
-                            nodeMap[path.back().x+j][path.back().y+i].state == CLOSE) {
-                        
-                                    nextCost = nodeMap[path.back().x+j][path.back().y+i].cost;
-                                    nextNode[0] = path.back().x+j;
-                                    nextNode[1] = path.back().y+i;    
-                            
-                    } else if(nodeMap[path.back().x+j][path.back().y+i].cost == nextCost &&
-                            nodeMap[path.back().x+j][path.back().y+i].state == CLOSE &&
-                            (goal[0]-(path.back().x+j))*(goal[0]-(path.back().x+j))+(goal[1]-(path.back().y+i))*(goal[1]-(path.back().y+i)) <
-                            (goal[0]-nextNode[0])*(goal[0]-nextNode[0])+(goal[1]-nextNode[1])*(goal[1]-nextNode[1]) ) {
-                            
-                            		std::cout << "okokko" << std::endl;
-                                    nextNode[0] = path.back().x+j;
-                                    nextNode[1] = path.back().y+i;                  
-                            }
-                    
-                    
-                }
-            }
-            path.push_back(Point(nextNode[0],nextNode[1]));
-        }
-}
+			//top
+			expandNode(toexpand,&pathList,0,-1,3,goal);
 
-std::vector<Point> PathPlanner::getPath() {
-    return path;
-}
+			//top-left
+			expandNode(toexpand,&pathList,-1,-1,4,goal);
 
-void PathPlanner::displayBMP() {
-    std::cout << std::endl << std::endl;
-    for(int i=0;i<height;i++) {
-        for(int j=0;j<width;j++) {
-            std::cout << map[j][i] << " ";
-        }
-        std::cout << std::endl;
-    }
-}
+			//top-right
+			expandNode(toexpand,&pathList,1,-1,4,goal);
 
-void PathPlanner::displayStates() {
-    std::cout << std::endl << std::endl;
-    for(int i=0;i<height;i++) {
-        for(int j=0;j<width;j++) {
-            std::cout << nodeMap[j][i].state << " ";
-        }
-        std::cout << std::endl;
-    }
-}
+			//bottom-left
+			expandNode(toexpand,&pathList,-1,1,4,goal);
 
-void PathPlanner::displayCosts() {
-    std::cout << std::endl << std::endl;
-    for(int i=0;i<height;i++) {
-        for(int j=0;j<width;j++) {
-            std::cout << nodeMap[j][i].cost << " ";
-        }
-        std::cout << std::endl;
-    }
-}
+			//bottom-right
+			expandNode(toexpand,&pathList,1,1,4,goal);
 
-void PathPlanner::displayPath() {
-	for(int i=0;i<height;i++) {
-		for(int j=0;j<width;j++) {
-			bool partOfPath = false;
-			for(int k=0;k<path.size();k++) {
-				if( path[k].x == j && path[k].y == i) {
-					std::cout << "P" << " ";
-					partOfPath = true;
-                                        break;
-				}
-			}
-			if(partOfPath == false) {
-			std::cout << map[j][i] << " ";
-			}
+			toexpand.nodes.back()->state = EXPLORED;
 		}
-		std::cout << std::endl;
+
 	}
+	return false;
+}
+
+Path PathPlanner::getPath() {
+	return path;
 }
 
 PathPlanner::~PathPlanner() {
 	for(int i=0;i<height;i++) {
-	delete map[i];
+		delete[] nodeMap[i];
 	}
-	delete map;
+	delete[] nodeMap;
 }
 
 // return false (=0) if out of bounds
@@ -225,31 +146,98 @@ PathPlanner::~PathPlanner() {
 // NOT the bounds of the array
 //thus its more restrictive
 bool PathPlanner::inBounds(int point[2]) {
-    if((point[0] > 0)
-            && (point[0]<width-1)
-            && (point[1] > 0)
-            && (point[1] < height-1)) {
-        return true;
-    }
-    return false;
+	if((point[0] > 0)
+			&& (point[0]<width-1)
+			&& (point[1] > 0)
+			&& (point[1] < height-1)) {
+		return true;
+	}
+	return false;
 }
 //x=4 y = 1
 void PathPlanner::setScaling(int radius) {
-    if(!radius) return;
-        for(int i=0;i<width;i++) {
-        for(int j=0;j<height;j++) {
-            if(map[i][j] == 'X') {
-                for(int k=-radius;k<=radius;k++) {
-                    for(int l=-(radius-k)*(radius+k)/radius;l<=(radius-k)*(radius+k)/radius;l++) {
-                        int temp[2] = {i+k,j+l};
-                        if(inBounds(temp)) {
-                            if(map[i+k][j+l] != 'X') {
-                                map[i+k][j+l] = 'S';
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+	if(radius < 0) return;
+	else if(radius == 0) {
+		for(int j=0;j<height;j++) {
+			for(int i=0;i<width;i++) {
+				if(nodeMap[i][j].state == SCALING)
+					nodeMap[i][j].state = UNREACHABLE;
+			}
+		}
+	} else {
+		for(int i=0;i<width;i++) {
+			for(int j=0;j<height;j++) {
+				if(nodeMap[i][j].state == UNREACHABLE) {
+					for(int k=-radius;k<=radius;k++) {
+						for(int l=-(radius-k)*(radius+k)/radius;l<=(radius-k)*(radius+k)/radius;l++) {
+							int temp[2] = {i+k,j+l};
+							if(inBounds(temp)) {
+								if(nodeMap[i+k][j+l].state != UNREACHABLE) {
+									nodeMap[i+k][j+l].state = SCALING;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
+
+int PathPlanner::computeHeuristic(int xs, int ys, int xg, int yg) {
+	return 4*std::min(abs(nodeMap[xs][ys].x -nodeMap[xg][yg].x),abs(nodeMap[xs][ys].y -nodeMap[xg][yg].y))+3*abs(abs(nodeMap[xs][ys].x -nodeMap[xg][yg].x)-abs(nodeMap[xs][ys].y -nodeMap[xg][yg].y));
+
+}
+
+void PathPlanner::expandNode(Path toexpand,std::vector<Path>* pathList, int xoffset,int yoffset,int costcoef, int goal[2]) {
+	if(nodeMap[toexpand.nodes.back()->x+xoffset][toexpand.nodes.back()->y+yoffset].state <= FRONTIER) {
+		toexpand.currentCost += costcoef*nodeMap[toexpand.nodes.back()->x+xoffset][toexpand.nodes.back()->y+yoffset].single_cost;
+		toexpand.heuristicCost = computeHeuristic(toexpand.nodes.back()->x+xoffset,toexpand.nodes.back()->y+yoffset,goal[0],goal[1]);
+		toexpand.nodes.push_back(&nodeMap[toexpand.nodes.back()->x+xoffset][toexpand.nodes.back()->y+yoffset]);
+		pathList->push_back(toexpand);
+	}
+
+}
+
+#ifdef DEBUG
+
+void PathPlanner::displayStates() {
+	std::cout << std::endl << std::endl;
+	for(int i=0;i<height;i++) {
+		for(int j=0;j<width;j++) {
+			std::cout << nodeMap[j][i].state << " ";
+		}
+		std::cout << std::endl;
+	}
+}
+
+void PathPlanner::displayCosts() {
+	std::cout << std::endl << std::endl;
+	for(int i=0;i<height;i++) {
+		for(int j=0;j<width;j++) {
+			std::cout << nodeMap[j][i].single_cost << " ";
+		}
+		std::cout << std::endl;
+	}
+}
+
+void PathPlanner::displayPath() {
+	for(int i=0;i<height;i++) {
+		for(int j=0;j<width;j++) {
+			bool partOfPath = false;
+			for(int k=0;k<path.nodes.size();k++) {
+				if( path.nodes[k]->x == j && path.nodes[k]->y == i) {
+					std::cout << "P" << " ";
+					partOfPath = true;
+					break;
+				}
+			}
+			if(partOfPath == false) {
+				std::cout << 'X' << " ";
+			}
+		}
+		std::cout << std::endl;
+	}
+}
+
+#endif
