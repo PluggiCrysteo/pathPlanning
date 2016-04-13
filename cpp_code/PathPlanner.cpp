@@ -24,7 +24,8 @@
 
 PathPlanner::PathPlanner(const char* bitmap,int scaling = -1) {
 	std::fstream file(bitmap, std::ios::in | std::ios::out | std::ios::binary);
-
+	if(!file.good())
+		DEBUG_("file not correctlry opened");
 	file.seekg(0);
 	width=0;
 	while(file.get() != '\n')
@@ -135,9 +136,9 @@ Path PathPlanner::getPath() {
 
 PathPlanner::~PathPlanner() {
 	for(int i=0;i<height;i++) {
-		delete nodeMap[i];
+		delete[] nodeMap[i];
 	}
-	delete nodeMap;
+	delete[] nodeMap;
 }
 
 // return false (=0) if out of bounds

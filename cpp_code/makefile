@@ -1,8 +1,8 @@
-libs = -lboost_system -lpthread
+libs = 
 std = -std=c++11
 
 demo:
-	g++ main.cpp PathPlanner.cpp -o demo.out $(libs) $(std) -DDEBUG
+	g++ main.cpp PathPlanner.cpp -o demo.out $(libs) $(std) -DDEBUG -g
 	mv demo.out ../demo.out
 
 lib:
